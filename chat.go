@@ -1,24 +1,74 @@
 package main
 
-import "sync"
+import (
+	"errors"
+	"sync"
+)
 
-type Chat struct { //switch to map
+type Chat struct {
 	mu    sync.Mutex
-	rooms []string
+	rooms map[string]room
 }
 
-type Room struct {
-	messages map[int]string
+type room struct {
+	messages []message
+	users    map[string]user
 }
 
-func (c *Chat) CreateRoom(name string) {
+type user struct {
+	name string
+}
+
+type message struct {
+	username string
+	message  string
+}
+
+var (
+	ErrUserNotInChat     = errors.New("user is not in the chat")
+	ErrSendMessage       = errors.New("error when sending message")
+	ErrRoomAlreadyExists = errors.New("room with that name already exists")
+	ErrNoRoomWithName    = errors.New("room with that name doesn't exist")
+)
+
+func (c *Chat) CreateRoom(name string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.rooms = append(c.rooms, name)
+
+	if _, exists := c.rooms[name]; exists {
+		return ErrRoomAlreadyExists
+	}
+
+	var emptyRoom room
+	c.rooms[name] = emptyRoom
+	return nil
 }
 
-//join room
+func (c *Chat) SendMessage(roomName string, message message) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-//leave room
+	if _, exists := c.rooms[roomName].users[message.username]; !exists {
+		return ErrUserNotInChat
+	}
 
-//send message to channel
+	if room, ok := c.rooms[roomName]; ok {
+		room.messages = append(room.messages, message)
+	} else {
+		return ErrSendMessage
+	}
+	return nil
+}
+
+func (c *Chat) JoinRoom(roomName string, user user) error {
+	if room, exists := c.rooms[roomName]; exists {
+		room.users[user.name] = user
+	} else {
+		return ErrNoRoomWithName
+	}
+	return nil
+}
+
+func (c *Chat) LeaveRoom(roomName string, user user) {
+	delete(c.rooms[roomName].users, user.name)
+}
