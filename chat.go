@@ -3,23 +3,26 @@ package main
 import (
 	"errors"
 	"sync"
+
+	"github.com/gorilla/websocket"
 )
 
 type Chat struct {
 	mu    sync.Mutex
-	rooms map[string]room
+	rooms map[string]Room
 }
 
-type room struct {
-	messages []message
-	users    map[string]user
+type Room struct {
+	messages []Message
+	users    map[string]User
 }
 
-type user struct {
+type User struct {
 	name string
+	conn *websocket.Conn
 }
 
-type message struct {
+type Message struct {
 	username string
 	message  string
 }
@@ -39,12 +42,12 @@ func (c *Chat) CreateRoom(name string) error {
 		return ErrRoomAlreadyExists
 	}
 
-	var emptyRoom room
+	var emptyRoom Room
 	c.rooms[name] = emptyRoom
 	return nil
 }
 
-func (c *Chat) SendMessage(roomName string, message message) error {
+func (c *Chat) SendMessage(roomName string, message Message) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -60,7 +63,7 @@ func (c *Chat) SendMessage(roomName string, message message) error {
 	return nil
 }
 
-func (c *Chat) JoinRoom(roomName string, user user) error {
+func (c *Chat) JoinRoom(roomName string, user User) error {
 	if room, exists := c.rooms[roomName]; exists {
 		room.users[user.name] = user
 	} else {
@@ -69,6 +72,6 @@ func (c *Chat) JoinRoom(roomName string, user user) error {
 	return nil
 }
 
-func (c *Chat) LeaveRoom(roomName string, user user) {
+func (c *Chat) LeaveRoom(roomName string, user User) {
 	delete(c.rooms[roomName].users, user.name)
 }
